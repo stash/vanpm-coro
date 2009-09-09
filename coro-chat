@@ -1,0 +1,74 @@
+#!/usr/bin/perl
+
+use AnyEvent;
+use AnyEvent::Handle;
+use AnyEvent::Socket;
+use Coro;
+use Coro::AnyEvent;
+use Guard;
+
+my %clients;
+my $client_counter = 0;
+
+my $server;
+my $shutdown = AnyEvent->condvar;
+$server = tcp_server undef, 4554, unblock_sub(\&client);
+$shutdown->recv;
+
+sub client {
+    my ($fh, $host, $port) = @_;
+    my $client_id = ++$client_counter;
+    my $cv = AnyEvent->condvar;
+    my $handle;
+    $handle = AnyEvent::Handle->new(
+        fh => $fh,
+        on_error => sub { $cv->croak("error $!") },
+        on_eof => $cv,
+    );
+
+    $handle->push_write("Name? ");
+    my $name;
+    $handle->push_read(line => unblock_sub {
+        $name = $_[1];
+        $cv->send;
+    });
+    $cv->recv;
+    undef $cv;
+    return unless $name;
+
+    $clients{$client_id} = $handle;
+    my $unset_client = guard { delete $clients{$client_id} };
+
+    $handle->push_write("Hi $name, Enter text to chat. A '.' by itself will disconnect you\n");
+
+    my $cv2;
+    while (1) {
+        $cv2 = AnyEvent->condvar;
+        $handle->on_error(sub { $cv2->croak("error $!") } );
+        $handle->on_eof($cv2);
+        $handle->push_read(line => unblock_sub { 
+            $cv2->send($_[1]);
+        });
+
+        my $chat_msg = $cv2->recv;
+        chomp($chat_msg);
+
+        # disconnect
+        last if ($chat_msg eq '.');
+
+        # disconnect *everybody*
+        if ($chat_msg =~ /get back to work/) {
+            $shutdown->send;
+            return;
+        }
+
+        # broadcast the message
+        for my $other_handle (values %clients) {
+            #next if ($handle == $other_handle); # skip this client
+            $other_handle->push_write($name.": ".$chat_msg."\n");
+            Coro::cede;
+        }
+    }
+
+    undef $handle;
+}
