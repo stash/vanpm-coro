@@ -1,0 +1,69 @@
+What is Coro?
+* Coroutines!
+* Perl threading that doesn't suck
+* Previous attempts:
+** ithreads (2002, perl 5.8) - multiple interpreters, no shared state b/w threads, many many bugs and caveats
+** "5.005 Threads" (ancient) - crazy hack, sorta worked.
+
+Coroutines?
+* coros: cooperative multi-tasking
+* threads: preemptive multi-tasking
+* coros: explicit and well-defined transfer points ("ok, let's cede to another coro")
+* threads: hidden and random transfer points ("surprise! new thread!")
+* many languages have coro implementations (e.g. Smalltalk, C, Python, Ruby, Perl 6)
+
+Example (ping-pong.pl)
+
+Why Coro?
+* less thrashing overhead; you can program exactly *when* to service other tasks.
+* simpler code; you don't have to worry about atomicity or random transfers.
+* share data and program code; one interpreter, one heap, faster than memcached
+* small "stack" per-coro (unlike the full interpreter for ithreads)
+
+Why not Coro?
+* paradigm shift, adds conceptual complexity; can be hard to debug
+* no need to share a lot of data but need multi-tasking? Parallel::ForkManager :)
+* non-cooperative code (e.g. long times between cedes, CPU hogging)
+* blocking I/O
+* can only use one "core" (one kernel task)
+
+AnyEvent
+* Common interface for a number of event-based frameworks
+** e.g. EV, POE, Gtk+
+* Abstracts waiting for I/O, timers, basic user activity, etc.
+* Makes it easy to write "callback style" programs
+
+Example (anyevent-chat)
+
+AnyEvent and Coro
+* cooperating modules
+* Coro can use AnyEvent to wait for events (prefers EV)
+* AnyEvent can use Coro to optimize condvar usage (blocking ->recv())
+* AnyEvent+Coro programs can have a simpler, less nested flow
+
+Example (coro-chat)
+
+Why AnyEvent?
+* speed and scalability (single threaded events scale much better than multiple threads)
+* rapid development; TCP or HTTP server in one line
+* Coro and AnyEvent are the best of friends (same author, mostly)
+* simplicity (esp. AnyEvent::Handle)
+* increasing number of modules
+
+Why not AnyEvent?
+* Some event frameworks are better than others, many have bugs that are hard to abstract-away
+* adds conceptual complexity, but many programmers are used to event-based programming
+* many CPAN modules are incompatible (LWP support is a slight hack)
+* RDBMS apps are slightly tedious to write (there is AnyEvent::DBI and Coro::Mysql, though)
+
+Cool, related, things
+* POE - more mature, more modules than AnyEvent. "Not that fast," says AnyEvent author.
+* Continuity - write stateful web-apps in an easy-to-read Coro style, COMET-like AJAX sessions.
+** Continuity::REPL - run Devel::REPL on a port (in a coro)
+** CGI::Inspect - add interactive breakpoints to your CGI app (cool web interface)
+* Squatting - meta-web framework, can support Continuity
+* Coro::Debug - run a process inspector as a coroutine, listening on a port
+* AnyEvent::XMPP - write scalable Jabber bots
+* AnyEvent::CouchDB - use couchdb for your objects/documents
+* IO::AIO - use kernel-level threads to do non-blocking I/O on a wide variety of syscalls
+* IO::Lambda - alternative to event-based programming, very interesting theory. Integrates with AnyEvent
