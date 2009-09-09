@@ -42,21 +42,21 @@ sub client {
         my $read_a_line;
         $read_a_line = sub {
             my $chat_msg = $_[1];
-            next unless length $chat_msg;
+            if (length $chat_msg) {
+                # disconnect self
+                return $cleanup->() if ($chat_msg eq '.');
 
-            # disconnect self
-            return $cleanup->() if ($chat_msg eq '.');
+                # disconnect *everybody*
+                if ($chat_msg =~ /get back to work/) {
+                    $shutdown->send;
+                    return $cleanup->();
+                }
 
-            # disconnect *everybody*
-            if ($chat_msg =~ /get back to work/) {
-                $shutdown->send;
-                return $cleanup->();
-            }
-
-            # broadcast the message
-            my $msg = $name.": ".$chat_msg."\n";
-            for my $c (values %clients) {
-                $c->push_write($msg);
+                # broadcast the message
+                my $msg = $name.": ".$chat_msg."\n";
+                for my $c (values %clients) {
+                    $c->push_write($msg);
+                }
             }
 
             $h->push_read(line => $read_a_line);

@@ -2,8 +2,8 @@ What is Coro?
 * Coroutines!
 * Perl threading that doesn't suck
 * Previous attempts:
-** ithreads (2002, perl 5.8) - multiple interpreters, no shared state b/w threads, many many bugs and caveats
-** "5.005 Threads" (ancient) - crazy hack, sorta worked.
+* ithreads (2002, perl 5.8) - multiple interpreters, no shared state b/w threads, many many bugs and caveats
+* "5.005 Threads" (ancient) - crazy hack, sorta worked.
 
 Coroutines?
 * coros: cooperative multi-tasking
@@ -22,7 +22,7 @@ Why Coro?
 
 Why not Coro?
 * paradigm shift, adds conceptual complexity; can be hard to debug
-* no need to share a lot of data but need multi-tasking? Parallel::ForkManager :)
+* no need to share a lot of data?  Parallel::ForkManager can share code
 * non-cooperative code (e.g. long times between cedes, CPU hogging)
 * blocking I/O
 * can only use one "core" (one kernel task)
@@ -32,6 +32,7 @@ AnyEvent
 ** e.g. EV, POE, Gtk+
 * Abstracts waiting for I/O, timers, basic user activity, etc.
 * Makes it easy to write "callback style" programs
+* Convenience functions for common I/O tasks
 
 Example (anyevent-chat)
 
@@ -67,3 +68,4 @@ Cool, related, things
 * AnyEvent::CouchDB - use couchdb for your objects/documents
 * IO::AIO - use kernel-level threads to do non-blocking I/O on a wide variety of syscalls
 * IO::Lambda - alternative to event-based programming, very interesting theory. Integrates with AnyEvent
+* Parallel::ForkManager - a way to share code (but not data) using "pre-forked" processes.
