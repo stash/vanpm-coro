@@ -66,8 +66,10 @@
   <ul>
     <li>coros: cooperative multi-tasking</li>
     <li>threads: preemptive multi-tasking</li>
-    <li>coros: explicit and well-defined transfer points ("ok, let's cede to another coro")</li>
-    <li>threads: hidden and random transfer points ("surprise! new thread!")</li>
+    <li>coros: explicit and well-defined transfer points (<i>"ok, let's cede
+        to another coro"</i>)</li>
+    <li>threads: hidden and random transfer points (<i>"surprise! new
+        thread!"</i>)</li>
     <li>many languages have coro implementations (e.g. Smalltalk, C, Python, Ruby, Perl 6)</li>
   </ul>
 </div>
@@ -87,6 +89,9 @@
         <li>"5.005 Threads" (ancient) - crazy hack, sorta worked.</li>
     </ul>
     </li>
+    <li>Library of "threading" primitives (e.g. semaphores, R/W locks, channels)</li>
+    <li>Some event-based programming abstractions (e.g. Timers and basic I/O
+    for <code>EV</code> and <code>AnyEvent</code>)</li>
   </ul>
 </div>
 
@@ -136,7 +141,7 @@
     <li>paradigm shift, adds conceptual complexity; can be hard to debug</li>
     <li>no need to share a lot of data?  <code>Parallel::ForkManager</code> can share code</li>
     <li>non-cooperative code (e.g. long times between cedes, CPU hogging)</li>
-    <li>blocking I/O</li>
+    <li>uncontrollable blocking I/O makes for a slow program</li>
     <li>can only use one "core" (one kernel task)</li>
   </ul>
 </div>
@@ -158,15 +163,23 @@
 </div>
 
 <div class="slide">
+  <h1>Example</h1>
+  <ul>
+      <li>Simple terminal chat program</li>
+      <li>Prompt for user name</li>
+      <li>Broadcast subsequent messages</li>
+      <li>Full source on github (link at end of talk)</li>
+  </ul>
+</div>
+
+<div class="slide">
   <h1>Example (anyevent-chat 1/2)</h1>
   <pre>
     my $server = tcp_server undef, 4554, \&amp;client;
 
     sub client {
-        $h = AnyEvent::Handle-&gt;new(
-            fh =&gt; $fh,
-            on_error =&gt; $cleanup,
-            on_eof =&gt; $cleanup,
+        my $h = AnyEvent::Handle-&gt;new(
+            fh =&gt; shift,
         );
 
         $h-&gt;push_write("Name? ");
@@ -181,9 +194,9 @@
 <div class="slide">
   <h1>Example (anyevent-chat 2/2)</h1>
   <pre>
-    my $read_a_line;
-    $read_a_line = sub {
+    my $read_a_line; $read_a_line = sub {
         my $chat_msg = $_[1];
+
         if (length $chat_msg) {
             # broadcast the message
             my $msg = $name.": ".$chat_msg."\n";
@@ -191,9 +204,11 @@
                 $c-&gt;push_write($msg);
             }
         }
+
         # continue reading:
         $h-&gt;push_read(line =&gt; $read_a_line);
     };
+
     # start reading:
     $h-&gt;push_read(line =&gt; $read_a_line);
   </pre>
@@ -225,7 +240,8 @@
   <ul>
     <li>cooperating modules</li>
     <li><code>Coro</code> can use <code>AnyEvent</code> to wait for events (prefers <code>EV</code>)</li>
-    <li><code>AnyEvent</code> can use <code>Coro</code> to optimize condvar usage (blocking -&gt;recv())</li>
+    <li><code>AnyEvent</code> can use <code>Coro</code> to optimize "condvar"
+    usage (unblocks <code>-&gt;recv()</code>)</li>
     <li><code>AnyEvent</code>+<code>Coro</code> programs can have a simpler, more natural, less nested flow</li>
   </ul>
 </div>
@@ -279,7 +295,6 @@
   <li><code>Continuity</code> - write stateful web-apps in an easy-to-read Coro style, COMET-like AJAX sessions.</li>
   <li><code>Continuity::REPL</code> - run <code>Devel::REPL</code> on a port (in a coro)</li>
   <li><code>CGI::Inspect</code> - add interactive breakpoints to your CGI app (cool web interface)</li>
-  <li><code>Squatting</code> - meta-web framework, can support <code>Continuity</code></li>
   <li><code>Coro::Debug</code> - run a process inspector as a coroutine, listening on a port</li>
   <li><code>AnyEvent::XMPP</code> - write scalable Jabber bots</li>
   <li><code>AnyEvent::CouchDB</code> - use couchdb for your objects/documents</li>
@@ -294,6 +309,7 @@
   <li><code>IO::AIO</code> - use kernel-level threads to do non-blocking I/O on a wide variety of syscalls</li>
   <li><code>IO::Lambda</code> - alternative to event-based programming, very interesting theory. Integrates with <code>AnyEvent</code></li>
   <li><code>Parallel::ForkManager</code> - a way to share code (but not data) using "pre-forked" processes.</li>
+  <li><code>Squatting</code> - meta-web framework, can support <code>Continuity</code></li>
   </ul>
 </div>
 
