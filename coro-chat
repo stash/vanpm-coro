@@ -23,13 +23,13 @@ sub client {
 
     my $cleanup = guard {
         delete $clients{$client_id};
-        $h->close();
+        $h->close(); # XXX cede
         print "$client_id done.\n";
     };
 
     # prompt for name
-    $h->print("Name? ");
-    my $name = $h->readline("\n");
+    $h->print("Name? "); # XXX cede
+    my $name = $h->readline(); # XXX cede
     return unless $name;
     chomp $name;
 
@@ -40,7 +40,7 @@ sub client {
               "A '.' by itself will disconnect you\n");
 
     while (1) {
-        my $chat_msg = $h->readline();
+        my $chat_msg = $h->readline(); # XXX cede
         return unless defined $chat_msg;
         chomp $chat_msg;
         next unless length $chat_msg;
@@ -62,7 +62,7 @@ sub client {
             my @cids = keys %clients;
             for my $cid (@cids) {
                 my $c = $clients{$cid};
-                $c->print($msg) if $c;
+                $c->print($msg) if $c; # XXX cede
             }
         };
     }
