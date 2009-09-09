@@ -1,60 +1,52 @@
 #!/usr/bin/perl
 
 use AnyEvent;
-use AnyEvent::Handle;
 use AnyEvent::Socket;
 use Coro;
 use Coro::AnyEvent;
+use Coro::Handle;
 use Guard;
 
 my %clients;
 my $client_counter = 0;
 
-my $server;
+# OK, cheat and use AnyEvent for the main server
 my $shutdown = AnyEvent->condvar;
-$server = tcp_server undef, 4554, unblock_sub(\&client);
+my $server = tcp_server undef, 4554, unblock_sub(\&client);
 $shutdown->recv;
 
 sub client {
     my ($fh, $host, $port) = @_;
+
     my $client_id = ++$client_counter;
-    my $cv = AnyEvent->condvar;
-    my $handle;
-    $handle = AnyEvent::Handle->new(
-        fh => $fh,
-        on_error => sub { $cv->croak("error $!") },
-        on_eof => $cv,
-    );
+    my $h = unblock $fh;
 
-    $handle->push_write("Name? ");
-    my $name;
-    $handle->push_read(line => unblock_sub {
-        $name = $_[1];
-        $cv->send;
-    });
-    $cv->recv;
-    undef $cv;
+    my $cleanup = guard {
+        delete $clients{$client_id};
+        $h->close();
+        print "$client_id done.\n";
+    };
+
+    # prompt for name
+    $h->print("Name? ");
+    my $name = $h->readline("\n");
     return unless $name;
+    chomp $name;
 
-    $clients{$client_id} = $handle;
-    my $unset_client = guard { delete $clients{$client_id} };
+    # client is now available to receive messages
+    $clients{$client_id} = $h;
 
-    $handle->push_write("Hi $name, Enter text to chat. A '.' by itself will disconnect you\n");
+    $h->print("Hi $name, Enter text to chat.\n".
+              "A '.' by itself will disconnect you\n");
 
-    my $cv2;
     while (1) {
-        $cv2 = AnyEvent->condvar;
-        $handle->on_error(sub { $cv2->croak("error $!") } );
-        $handle->on_eof($cv2);
-        $handle->push_read(line => unblock_sub { 
-            $cv2->send($_[1]);
-        });
-
-        my $chat_msg = $cv2->recv;
-        chomp($chat_msg);
+        my $chat_msg = $h->readline();
+        return unless defined $chat_msg;
+        chomp $chat_msg;
+        next unless length $chat_msg;
 
         # disconnect
-        last if ($chat_msg eq '.');
+        return if ($chat_msg eq '.');
 
         # disconnect *everybody*
         if ($chat_msg =~ /get back to work/) {
@@ -63,12 +55,15 @@ sub client {
         }
 
         # broadcast the message
-        for my $other_handle (values %clients) {
-            #next if ($handle == $other_handle); # skip this client
-            $other_handle->push_write($name.": ".$chat_msg."\n");
-            Coro::cede;
-        }
+        my $msg = $name.": ".$chat_msg."\n";
+        async {
+            # Capture list of client ids since list may change between print()
+            # calls.
+            my @cids = keys %clients;
+            for my $cid (@cids) {
+                my $c = $clients{$cid};
+                $c->print($msg) if $c;
+            }
+        };
     }
-
-    undef $handle;
 }

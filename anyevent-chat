@@ -1,0 +1,68 @@
+#!/usr/bin/perl
+
+use AnyEvent;
+use AnyEvent::Handle;
+use AnyEvent::Socket;
+
+my %clients;
+my $client_counter = 0;
+
+my $shutdown = AnyEvent->condvar;
+my $server = tcp_server undef, 4554, \&client;
+$shutdown->recv;
+
+sub client {
+    my ($fh, $host, $port) = @_;
+
+    my $client_id = ++$client_counter;
+    my $h;
+    my $cleanup = sub {
+        delete $clients{$client_id};
+        $h->destroy();
+        print "$client_id done.\n";
+    };
+
+    $h = AnyEvent::Handle->new(
+        fh => $fh,
+        on_error => $cleanup,
+        on_eof => $cleanup,
+    );
+
+    # prompt for name
+    $h->push_write("Name? ");
+    $h->push_read(line => sub {
+        my $name = $_[1];
+        return $cleanup->() unless $name;
+
+        # client is now available to receive messages
+        $clients{$client_id} = $h;
+
+        $h->push_write("Hi $name, Enter text to chat.\n".
+                            "A '.' by itself will disconnect you\n");
+        my $read_a_line;
+        $read_a_line = sub {
+            my $chat_msg = $_[1];
+            next unless length $chat_msg;
+
+            # disconnect self
+            return $cleanup->() if ($chat_msg eq '.');
+
+            # disconnect *everybody*
+            if ($chat_msg =~ /get back to work/) {
+                $shutdown->send;
+                return $cleanup->();
+            }
+
+            # broadcast the message
+            my $msg = $name.": ".$chat_msg."\n";
+            for my $c (values %clients) {
+                $c->push_write($msg);
+            }
+
+            $h->push_read(line => $read_a_line);
+        };
+        $h->push_read(line => $read_a_line);
+    });
+    
+    return;
+}
